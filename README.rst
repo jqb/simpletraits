@@ -62,6 +62,14 @@ If you want to add your own defaults you have two options:
         )
 
 
+How to install
+--------------
+
+::
+
+    $> pip install simpletraits
+
+
 Tests
 -----
 
