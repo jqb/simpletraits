@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+from .utils import collect_attribute, chain
+
 
 class NIL(object):
     def __nonzero__(self):
@@ -20,8 +22,8 @@ class lazy(object):
         self.args = args
         self.kwargs = kwargs
 
-    def __call__(self, instance=None):
-        return self.toinvoke(instance, *self.args, **self.kwargs)
+    def __call__(self):
+        return self.toinvoke(*self.args, **self.kwargs)
 
 
 class kwa(object):
@@ -33,8 +35,9 @@ class kwa(object):
 class basemeta(type):
     def __new__(cls, cls_name, bases, attrs):
         super_new = super(basemeta, cls).__new__
-        _arg = attrs['_arg'] = attrs.pop('_arg', ())
-        _kwa = attrs['_kwa'] = attrs.pop('_kwa', ())
+
+        _arg = attrs.pop('_arg', ())
+        _kwa = attrs.pop('_kwa', ())
 
         if not isinstance(_arg, tuple):
             raise TypeError('"_arg" variable of class "%s" need to be a tuple' % (
@@ -47,9 +50,22 @@ class basemeta(type):
             ))
 
         if isinstance(_kwa, dict):
-            _kwa = attrs['_kwa'] = [kwa(key, val) for key, val in _kwa.items()]
+            _kwa = attrs['_kwa'] = tuple([kwa(name, _kwa[name]) for name in _kwa])
+        else:
+            _kwa = attrs['_kwa'] = tuple([
+                kw if isinstance(kw, kwa) else kwa(kw)
+                for kw in _kwa
+            ])
 
-        return super_new(cls, cls_name, bases, attrs)
+        args = collect_attribute('_arg', bases[::-1]) + [list(_arg)]
+        kwas = collect_attribute('_kwa', bases[::-1]) + [list(_kwa)]
+
+        attrs['_arg'] = _arg = tuple(chain(*args))
+        attrs['_kwa'] = _kwa = tuple(chain(*kwas))
+
+        new_class = super_new(cls, cls_name, bases, attrs)
+        return new_class
+
 
     def __call__(cls, *args, **kwargs):
         self = type.__call__(cls, *args, **kwargs)
@@ -94,7 +110,7 @@ class baseclass(object):
                 val = getattr(self.__class__, name, default)
 
             try:
-                val = val(self)
+                val = val()
             except TypeError:  # not callable
                 pass
             setattr(self, name, val)

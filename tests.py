@@ -51,11 +51,42 @@ class BaseClassTest(unittest.TestCase):
                 counter = 0,
                 name = "Kuba",
                 last_name = "Janoszek",
+                items = list,
             )
         test = KWATest()
         self.assertEqual(test.counter, 0)
         self.assertEqual(test.name, "Kuba")
         self.assertEqual(test.last_name, "Janoszek")
+        self.assertEqual(test.items, [])
+
+
+def make(bases, **attrs):
+    if not hasattr(bases, '__iter__'):
+        bases = (bases,)
+    return type('DynamicClass', bases, attrs)
+
+
+class AttrInheritanceTest(unittest.TestCase):
+    def extended_user_class(self):
+        ExtendedUser = make(User, **dict(
+            _arg = ("is_stuff",),
+            _kwa = ("email",),
+        ))
+        return ExtendedUser
+
+    def test_no_error_on_inheritance(self):
+        try:
+            self.extended_user_class()
+        except Exception, e:
+            self.fail("Exception raised on inheritance: %s" % e)
+
+    def test_inheritance_should_merge_ARG_and_KWA_attributes_and_saves_the_order(self):
+        cls = self.extended_user_class()
+        self.assertEqual(cls._arg, ("name", "last_name", "is_stuff"))
+        self.assertEqual(
+            tuple(map(lambda k: k.name, cls._kwa)),
+            ("passwd", "default_passwd", "email"),
+        )
 
 
 if __name__ == '__main__':
